@@ -1,15 +1,24 @@
-import tarantool from "k6/x/tarantool";
+import tarantool from 'k6/x/tarantool';
 
-const conn = tarantool.connect("localhost:3301");
+const tarantool_addrs = __ENV.TARANTOOL_ADDRS || 'localhost:3301';
+const tarantool_user = __ENV.TARANTOOL_USER || '';
+const tarantool_password = __ENV.TARANTOOL_PASSWORD || '';
+
+const conn = new tarantool.Client({
+  addrs: tarantool_addrs.split(','),
+  user: tarantool_user,
+  password: tarantool_password,
+});
 
 export const setup = () => {
-  tarantool.insert(conn, "cars", [1, "cadillac"]);
+  console.log('setup');
 };
 
-export default () => {
-  console.log(tarantool.call(conn, "box.space.cars:select", [1]));
+export default async () => {
+  const resp = await conn.call('test_func', ['some value']);
+  console.log(resp)
 };
 
 export const teardown = () => {
-  tarantool.delete(conn, "cars", "pk", [1]);
+  console.log('teardown');
 };
