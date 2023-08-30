@@ -1,0 +1,79 @@
+name: build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  K6_VERSION: v0.46.0
+  XK6_VERSION: v0.9.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin]
+        arch: [amd64]
+    env:
+      ARTIFACT_NAME: k6-${{ matrix.os }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install xk6
+        run: go install go.k6.io/xk6/cmd/xk6@$XK6_VERSION
+
+      - name: Build k6 with tarantool-xk6 extension
+        run: |
+          xk6 build $K6_VERSION \
+            --with github.com/tarantool/xk6-tarantool=. \
+            --output $ARTIFACT_NAME
+        env:
+          CGO_ENABLED: "0"
+          GOFLAGS: "-tags=go_tarantool_ssl_disable,go_tarantool_call_17,go_tarantool_msgpack_v5"
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            $ARTIFACT_NAME
+
+  build-ssl:
+    runs-on: ubuntu-latest
+    env:
+      ARTIFACT_NAME: k6_ssl-linux-amd64
+    steps:
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ">=1.21.0"
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install xk6
+        run: go install go.k6.io/xk6/cmd/xk6@$XK6_VERSION
+
+      - name: Build k6 with tarantool-xk6 extension with SSL support
+        run: |
+          xk6 build $K6_VERSION \
+            --with github.com/tarantool/xk6-tarantool=. \
+            --output $ARTIFACT_NAME
+        env:
+          CGO_ENABLED: "1"
+          GOFLAGS: "-tags=go_tarantool_call_17,go_tarantool_msgpack_v5"
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            $ARTIFACT_NAME
