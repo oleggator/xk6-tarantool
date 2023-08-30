@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '>=1.21.0'
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: install xk6
+        run: go install go.k6.io/xk6/cmd/xk6@latest
+
+      - name: build k6
+        run: |
+          GOFLAGS=-tags=go_tarantool_ssl_disable \
+          CGO_ENABLED=0 \
+          xk6 build master --output k6 --with github.com/tarantool/xk6-tarantool=.
+      
+      - name: build k6_ssl
+        run: |
+          CGO_ENABLED=1 \
+          xk6 build master --output k6_ssl --with github.com/tarantool/xk6-tarantool=.
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            k6
+            k6_ssl
